@@ -43,7 +43,6 @@ async def ussd_handler(request: Request):
         log_ussd_session(session_id, phone_number, "MENU_OPEN")
         response_text = (
             "CON Welcome to ZamID Connect\n"
-            "Dial *384*98008# anytime\n"
             "1. Check ID Status\n"
             "2. Verify NRC Number\n"
             "3. Report Lost NRC\n"
