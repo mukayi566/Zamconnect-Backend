@@ -128,35 +128,43 @@ async def register(request: Request):
         # 2. Create citizen record
         citizen_data = {
             "id": user_id,
-            "nrc_number": body.get("nrc"),
+            "nrc_number": body.get("nrc") or None,
             "first_name": first_name,
             "last_name": last_name,
-            "date_of_birth": body.get("date_of_birth"),
-            "gender": body.get("gender"),
-            "phone": body.get("phone"),
+            "date_of_birth": body.get("date_of_birth") or None,
+            "gender": body.get("gender", "male"),
+            "phone": body.get("phone") or None,
             "email": email,
             "status": "pending",
-            "province": body.get("province"),
-            "district": body.get("district"),
-            "address": body.get("address"),
-            # New Identity Fields
-            "nrc_url": body.get("nrc_url"),
-            "passport_url": body.get("passport_url"),
-            "birth_cert_url": body.get("birth_cert_url"),
-            "selfie_url": body.get("selfie_url"),
-            "signature_url": body.get("signature_url"),
+            "province": body.get("province") or None,
+            "district": body.get("district") or None,
+            "address": body.get("address") or None,
+            # Identity document URLs
+            "nrc_url": body.get("nrc_url") or None,
+            "passport_url": body.get("passport_url") or None,
+            "birth_cert_url": body.get("birth_cert_url") or None,
+            "selfie_url": body.get("selfie_url") or None,
+            "signature_url": body.get("signature_url") or None,
             "biometrics_enabled": body.get("biometrics_enabled", False),
-            "created_at": "now()" # Supabase will handle this if omitted, but explicit is fine
+            # Let Supabase handle created_at automatically (do NOT pass "now()" as string)
         }
         
-        # Generate QR
-        qr_payload = generate_qr_payload(citizen_data)
-        citizen_data["qr_payload"] = qr_payload
+        # Generate QR — safe even if nrc_number is None (basic registration)
+        try:
+            qr_payload = generate_qr_payload(citizen_data)
+            citizen_data["qr_payload"] = qr_payload
+        except Exception:
+            citizen_data["qr_payload"] = None
         
-        supabase.table("citizens").insert(citizen_data).execute()
+        insert_res = supabase.table("citizens").insert(citizen_data).execute()
+        
+        if not insert_res.data:
+            raise HTTPException(status_code=400, detail="Failed to save citizen record")
         
         return api_response(success=True, message="Registration successful", data={"user_id": user_id})
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
