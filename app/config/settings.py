@@ -41,8 +41,9 @@ class Settings(BaseSettings):
     LOCKOUT_DURATION_MINUTES: int = 30
 
     # Africa's Talking
-    AT_USERNAME: str = "zamid"
+    AT_USERNAME: str = "sandbox"  # change to "zamid" in production
     AT_API_KEY: str = "your_key"
+    AT_USSD_CODE: str = "*384*98008#"
 
     # Logging
     LOG_LEVEL: str = "INFO"
