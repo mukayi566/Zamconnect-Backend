@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
-from app.schemas.auth import LoginRequest, TokenResponse, RefreshRequest
+from app.schemas.auth import LoginRequest, TokenResponse, RefreshRequest, RegisterRequest
+from fastapi.responses import JSONResponse
 from app.config.supabase import supabase
 from app.services.token_service import verify_password, create_access_token, create_refresh_token, decode_token
 from app.utils.response import api_response
@@ -8,6 +9,9 @@ from app.services.audit_service import log_audit
 from app.models.enums import AuditAction
 from app.services.qr_service import generate_qr_payload
 from app.middleware.auth import get_current_user
+from app.utils.date import calculate_age
+from datetime import datetime, date
+from app.schemas.auth import AgeVerificationResponse, DependentCreateRequest
 
 
 
@@ -101,26 +105,35 @@ async def refresh(request: RefreshRequest):
     )
 
 @router.post("/register")
-async def register(request: Request):
+async def register(request: RegisterRequest):
     try:
-        body = await request.json()
-        email = body.get("email")
-        password = body.get("password")
-        
-        if not email or not password:
-            raise HTTPException(status_code=400, detail="Email and password required")
-            
+        # 0. Age Validation
+        if request.date_of_birth:
+            try:
+                dob = datetime.strptime(request.date_of_birth, "%Y-%m-%d").date()
+                age = calculate_age(dob)
+                if age < 16:
+                    return JSONResponse(
+                        status_code=400,
+                        content=api_response(
+                            success=False, 
+                            message="Registration failed: Users under the age of 16 are not allowed to register independently. Please complete registration under a parent or guardian account."
+                        )
+                    )
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
         # 1. Create auth user in Supabase
         auth_res = supabase.auth.sign_up({
-            "email": email,
-            "password": password
+            "email": request.email,
+            "password": request.password
         })
         
         if not auth_res.user:
             raise HTTPException(status_code=400, detail="Failed to create auth user")
             
         user_id = auth_res.user.id
-        full_name = body.get("full_name", "")
+        full_name = request.full_name or ""
         name_parts = full_name.split(" ")
         first_name = name_parts[0] if name_parts else ""
         last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
@@ -128,28 +141,27 @@ async def register(request: Request):
         # 2. Create citizen record
         citizen_data = {
             "id": user_id,
-            "nrc_number": body.get("nrc") or None,
+            "nrc_number": request.nrc or None,
             "first_name": first_name,
             "last_name": last_name,
-            "date_of_birth": body.get("date_of_birth") or None,
-            "gender": body.get("gender", "male"),
-            "phone": body.get("phone") or None,
-            "email": email,
+            "date_of_birth": request.date_of_birth or None,
+            "gender": request.gender or "male",
+            "phone": request.phone or None,
+            "email": request.email,
             "status": "pending",
-            "province": body.get("province") or None,
-            "district": body.get("district") or None,
-            "address": body.get("address") or None,
-            # Identity document URLs
-            "nrc_url": body.get("nrc_url") or None,
-            "passport_url": body.get("passport_url") or None,
-            "birth_cert_url": body.get("birth_cert_url") or None,
-            "selfie_url": body.get("selfie_url") or None,
-            "signature_url": body.get("signature_url") or None,
-            "biometrics_enabled": body.get("biometrics_enabled", False),
-            # Let Supabase handle created_at automatically (do NOT pass "now()" as string)
+            "province": request.province or None,
+            "district": request.district or None,
+            "address": request.address or None,
+            "nrc_url": request.nrc_url or None,
+            "passport_url": request.passport_url or None,
+            "birth_cert_url": request.birth_cert_url or None,
+            "selfie_url": request.selfie_url or None,
+            "signature_url": request.signature_url or None,
+            "signature_url": request.signature_url or None,
+            "biometrics_enabled": request.biometrics_enabled or False,
+            "guardian_id": request.guardian_id or None,
         }
         
-        # Generate QR — safe even if nrc_number is None (basic registration)
         try:
             qr_payload = generate_qr_payload(citizen_data)
             citizen_data["qr_payload"] = qr_payload
@@ -161,15 +173,94 @@ async def register(request: Request):
         if not insert_res.data:
             raise HTTPException(status_code=400, detail="Failed to save citizen record")
         
-        return api_response(success=True, message="Registration successful", data={"user_id": user_id})
+        return JSONResponse(
+            status_code=201,
+            content=api_response(success=True, message="Registration successful", data={"user_id": user_id})
+        )
         
-    except HTTPException:
-        raise
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return JSONResponse(
+            status_code=400,
+            content=api_response(success=False, message=str(e))
+        )
 
 @router.get("/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return api_response(success=True, message="Profile fetched", data=current_user)
+
+@router.get("/verify-age", response_model=AgeVerificationResponse)
+async def verify_age(dob: str):
+    try:
+        birth_date = datetime.strptime(dob, "%Y-%m-%d").date()
+        age = calculate_age(birth_date)
+        is_eligible = age >= 16
+        return AgeVerificationResponse(
+            is_eligible=is_eligible,
+            age=age,
+            message="Eligible for independent registration" if is_eligible else "Must register under a guardian"
+        )
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+@router.post("/dependents")
+async def add_dependent(request: DependentCreateRequest, current_user: dict = Depends(get_current_user)):
+    try:
+        # 1. Calculate age
+        dob = datetime.strptime(request.date_of_birth, "%Y-%m-%d").date()
+        age = calculate_age(dob)
+        
+        if age >= 16:
+            raise HTTPException(status_code=400, detail="Users 16 and above should register independently.")
+
+        # 2. Prepare citizen data
+        # Note: We generate a random ID since dependents don't have a Supabase Auth ID
+        import uuid
+        dependent_id = str(uuid.uuid4())
+        
+        name_parts = request.full_name.split(" ")
+        first_name = name_parts[0] if name_parts else ""
+        last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+        
+        # Get guardian details from current_user
+        guardian_id = current_user["id"]
+        guardian_res = supabase.table("citizens").select("*").eq("id", guardian_id).single().execute()
+        guardian_data = guardian_res.data
+        
+        citizen_data = {
+            "id": dependent_id,
+            "nrc_number": request.nrc or None,
+            "first_name": first_name,
+            "last_name": last_name,
+            "date_of_birth": request.date_of_birth,
+            "gender": request.gender,
+            "guardian_id": guardian_id,
+            "status": "pending",
+            # Inherit some location data from guardian
+            "province": guardian_data.get("province") if guardian_data else None,
+            "district": guardian_data.get("district") if guardian_data else None,
+            "address": guardian_data.get("address") if guardian_data else None,
+            "birth_cert_url": request.birth_cert_url or None,
+        }
+        
+        qr_payload = generate_qr_payload(citizen_data)
+        citizen_data["qr_payload"] = qr_payload
+        
+        # 3. Insert into database
+        insert_res = supabase.table("citizens").insert(citizen_data).execute()
+        
+        if not insert_res.data:
+            raise HTTPException(status_code=400, detail="Failed to save dependent record")
+            
+        return api_response(
+            success=True,
+            message="Dependent added successfully",
+            data={"dependent_id": dependent_id}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 

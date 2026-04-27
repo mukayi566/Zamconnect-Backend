@@ -114,3 +114,9 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Citizen profile not found")
     return api_response(success=True, message="Profile fetched", data=res.data)
 
+@router.get("/dependents")
+async def get_my_dependents(current_user: dict = Depends(get_current_user)):
+    res = supabase.table("citizens").select("*").eq("guardian_id", current_user["sub"]).execute()
+    return api_response(success=True, message="Dependents fetched", data=res.data)
+
+

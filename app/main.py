@@ -29,6 +29,10 @@ def create_app() -> FastAPI:
     app.include_router(audit.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
 
+    @app.get("/api")
+    async def api_root():
+        return {"status": "ok", "message": "ZamID Connect API v1"}
+
 
 
     @app.get("/")

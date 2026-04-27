@@ -19,6 +19,7 @@ class CitizenCreateRequest(BaseModel):
     district: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
+    guardian_id: Optional[str] = None
 
     @field_validator("nrc_number")
     @classmethod
@@ -64,6 +65,7 @@ class CitizenResponse(BaseModel):
     district: Optional[str]
     status: str
     qr_payload: Optional[str]
+    guardian_id: Optional[str]
     created_at: str
     updated_at: str
 
