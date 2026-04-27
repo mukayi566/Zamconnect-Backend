@@ -10,7 +10,8 @@ ZAMBIAN_PROVINCES = [
 ]
 
 class CitizenCreateRequest(BaseModel):
-    nrc_number: str
+    registration_type: Optional[str] = "full"  # "basic" or "full"
+    nrc_number: Optional[str] = None
     first_name: str
     last_name: str
     date_of_birth: date
@@ -23,8 +24,8 @@ class CitizenCreateRequest(BaseModel):
 
     @field_validator("nrc_number")
     @classmethod
-    def validate_nrc(cls, v: str) -> str:
-        if not re.match(r"^\d{6}/\d{2}/\d$", v):
+    def validate_nrc(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not re.match(r"^\d{6}/\d{2}/\d$", v):
             raise ValueError("NRC must match format 000000/00/0")
         return v
 
@@ -56,7 +57,7 @@ class CitizenUpdateRequest(BaseModel):
 
 class CitizenResponse(BaseModel):
     id: str
-    nrc_number: str
+    nrc_number: Optional[str] = None
     first_name: str
     last_name: str
     date_of_birth: date

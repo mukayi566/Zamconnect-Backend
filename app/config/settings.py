@@ -20,8 +20,14 @@ class Settings(BaseSettings):
     JWT_REFRESH_EXPIRE_DAYS: int = 7
     JWT_ALGORITHM: str = "HS256"
 
-    # QR Signing
-    QR_SIGNING_SECRET: str = "zamid_qr_hmac_secret_key_2026"
+    # QR Signing (v2 JWT — one-time tokens)
+    # Use a strong random secret: python -c "import secrets; print(secrets.token_hex(32))"
+    QR_SIGNING_SECRET: str = "zamid_qr_secret_CHANGE_ME"
+    QR_TOKEN_EXPIRE_SECONDS: int = 60        # Time window for QR token validity
+
+    # Redis (for production token blacklist — replaces in-memory set in qr_service.py)
+    # Leave empty to use in-memory blacklist (fine for single-instance deployments)
+    REDIS_URL: str = ""
 
     # CORS
     ALLOWED_ORIGINS: str = "*"
