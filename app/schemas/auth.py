@@ -17,6 +17,7 @@ class RefreshRequest(BaseModel):
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
+    registration_type: Optional[str] = "full"
     full_name: Optional[str] = None
     nrc: Optional[str] = None
     date_of_birth: Optional[str] = None

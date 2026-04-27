@@ -187,6 +187,7 @@ async def register(request: RegisterRequest):
         # 2. Create citizen record
         citizen_data = {
             "id": user_id,
+            "registration_type": request.registration_type or "full",
             "nrc_number": request.nrc or None,
             "first_name": first_name,
             "last_name": last_name,
