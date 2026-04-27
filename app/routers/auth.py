@@ -20,61 +20,107 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/login")
 async def login(request: LoginRequest):
     try:
-        # 1. Authenticate with Supabase
+        # 1. Authenticate with Supabase Auth (works for ALL users)
         response = supabase.auth.sign_in_with_password({
             "email": request.email,
             "password": request.password
         })
         
-        user_id = response.user.id
-        
-        # 2. Get admin user details (role, name)
-        admin_res = supabase.table("admin_users").select("*").eq("id", user_id).single().execute()
-        
-        if not admin_res.data:
-            raise HTTPException(status_code=403, detail="User not found in admin records")
+        if not response.user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
             
-        admin_data = admin_res.data
+        user_id = response.user.id
+
+        # 2a. Check citizens table first (mobile app users)
+        citizen_res = supabase.table("citizens").select("*").eq("id", user_id).single().execute()
         
-        # 3. Create our own JWTs
-        user_payload = {
-            "sub": user_id,
-            "email": request.email,
-            "role": admin_data["role"],
-            "full_name": admin_data["full_name"]
-        }
-        
-        access_token = create_access_token(user_payload)
-        refresh_token = create_refresh_token(user_payload)
-        
-        # 4. Audit Log
-        await log_audit(
-            action=AuditAction.LOGIN,
-            actor_id=user_id,
-            actor_email=request.email,
-            target_id=user_id,
-            target_type="admin",
-            details={"ip": "0.0.0.0"} # extract from request in production
-        )
-        
-        return api_response(
-            success=True,
-            message="Login successful",
-            data={
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-                "token_type": "bearer",
-                "user": {
-                    "id": user_id,
-                    "email": request.email,
-                    "role": admin_data["role"],
-                    "full_name": admin_data["full_name"]
-                }
+        if citizen_res.data:
+            citizen = citizen_res.data
+            full_name = f"{citizen.get('first_name', '')} {citizen.get('last_name', '')}".strip()
+            user_payload = {
+                "sub": user_id,
+                "email": request.email,
+                "role": "citizen",
+                "full_name": full_name,
+                "type": "citizen",
             }
+            access_token = create_access_token(user_payload)
+            refresh_token = create_refresh_token(user_payload)
+
+            await log_audit(
+                action=AuditAction.LOGIN,
+                actor_id=user_id,
+                actor_email=request.email,
+                target_id=user_id,
+                target_type="citizen",
+                details={"ip": "0.0.0.0"}
+            )
+
+            return api_response(
+                success=True,
+                message="Login successful",
+                data={
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "token_type": "bearer",
+                    "user": {
+                        "id": user_id,
+                        "email": request.email,
+                        "role": "citizen",
+                        "full_name": full_name,
+                    }
+                }
+            )
+
+        # 2b. Fall back to admin_users table (web admin panel)
+        admin_res = supabase.table("admin_users").select("*").eq("id", user_id).single().execute()
+
+        if admin_res.data:
+            admin_data = admin_res.data
+            user_payload = {
+                "sub": user_id,
+                "email": request.email,
+                "role": admin_data["role"],
+                "full_name": admin_data["full_name"],
+                "type": "admin",
+            }
+            access_token = create_access_token(user_payload)
+            refresh_token = create_refresh_token(user_payload)
+
+            await log_audit(
+                action=AuditAction.LOGIN,
+                actor_id=user_id,
+                actor_email=request.email,
+                target_id=user_id,
+                target_type="admin",
+                details={"ip": "0.0.0.0"}
+            )
+
+            return api_response(
+                success=True,
+                message="Login successful",
+                data={
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "token_type": "bearer",
+                    "user": {
+                        "id": user_id,
+                        "email": request.email,
+                        "role": admin_data["role"],
+                        "full_name": admin_data["full_name"],
+                    }
+                }
+            )
+
+        # 3. User authenticated with Supabase but has no profile record
+        raise HTTPException(
+            status_code=403,
+            detail="Account not found. Please complete registration first."
         )
-        
+
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        # Check for specific error codes like account_locked if implemented
         raise HTTPException(status_code=401, detail=str(e))
 
 @router.post("/refresh")
