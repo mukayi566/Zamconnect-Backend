@@ -203,7 +203,6 @@ async def register(request: RegisterRequest):
             "birth_cert_url": request.birth_cert_url or None,
             "selfie_url": request.selfie_url or None,
             "signature_url": request.signature_url or None,
-            "signature_url": request.signature_url or None,
             "biometrics_enabled": request.biometrics_enabled or False,
             "guardian_id": request.guardian_id or None,
         }
@@ -211,13 +210,19 @@ async def register(request: RegisterRequest):
         try:
             qr_payload = generate_qr_payload(citizen_data)
             citizen_data["qr_payload"] = qr_payload
-        except Exception:
+        except Exception as qr_err:
+            print(f"QR Generation Error: {qr_err}")
             citizen_data["qr_payload"] = None
         
-        insert_res = supabase.table("citizens").insert(citizen_data).execute()
-        
-        if not insert_res.data:
-            raise HTTPException(status_code=400, detail="Failed to save citizen record")
+        try:
+            insert_res = supabase.table("citizens").insert(citizen_data).execute()
+            if not insert_res.data:
+                raise Exception("Database returned empty result on insert")
+        except Exception as db_err:
+            print(f"Database Insert Error: {db_err}")
+            # Optional: Delete the auth user if the DB insert fails to keep them in sync
+            # supabase.auth.admin.delete_user(user_id) 
+            raise HTTPException(status_code=400, detail=f"Failed to save citizen record: {str(db_err)}")
         
         return JSONResponse(
             status_code=201,
@@ -227,6 +232,7 @@ async def register(request: RegisterRequest):
     except HTTPException as he:
         raise he
     except Exception as e:
+        print(f"Registration General Error: {e}")
         return JSONResponse(
             status_code=400,
             content=api_response(success=False, message=str(e))
