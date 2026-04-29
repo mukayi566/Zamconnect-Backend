@@ -61,6 +61,18 @@ async def get_citizens(
     )
 
 
+@router.get("/{id}")
+async def get_citizen_by_id(
+    id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    res = supabase.table("citizens").select("*").eq("id", id).execute()
+    if not res.data or len(res.data) == 0:
+        raise HTTPException(status_code=404, detail="Citizen not found")
+    
+    return api_response(success=True, message="Citizen fetched", data=res.data[0])
+
+
 # ---------------------------------------------------------------------------
 # Register a citizen (admin / registrar)
 # ---------------------------------------------------------------------------
