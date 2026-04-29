@@ -128,37 +128,62 @@ async def login(request: LoginRequest):
     except Exception as e:
         error_msg = str(e)
         print(f"Login General Error: {error_msg}")
-        # Check if it's a Supabase error with a specific message
+        # Log the full traceback for debugging if possible
+        import traceback
+        traceback.print_exc()
+        
+        # Check for common Supabase errors
         if "invalid" in error_msg.lower() and "credentials" in error_msg.lower():
             raise HTTPException(status_code=401, detail="Invalid email or password")
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {error_msg}")
+            
+        # If it's a database error or something else, still return a 401/403 but with more context
+        # to avoid the generic 500 which is hard to debug on mobile.
+        raise HTTPException(
+            status_code=401, 
+            detail=f"Authentication failed: {error_msg}"
+        )
 
 @router.post("/refresh")
 async def refresh(request: RefreshRequest):
-    payload = decode_token(request.refresh_token, settings.JWT_REFRESH_SECRET)
-    if not payload or payload.get("type") != "refresh":
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    try:
+        payload = decode_token(request.refresh_token, settings.JWT_REFRESH_SECRET)
+        if not payload or payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+            
+        # Safely extract payload fields
+        user_id = payload.get("sub")
+        email = payload.get("email")
+        role = payload.get("role")
+        full_name = payload.get("full_name")
         
-    # Re-issue tokens
-    user_payload = {
-        "sub": payload["sub"],
-        "email": payload["email"],
-        "role": payload["role"],
-        "full_name": payload["full_name"]
-    }
-    
-    access_token = create_access_token(user_payload)
-    refresh_token = create_refresh_token(user_payload)
-    
-    return api_response(
-        success=True,
-        message="Token refreshed",
-        data={
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer"
+        if not all([user_id, email, role]):
+            raise HTTPException(status_code=401, detail="Incomplete refresh token payload")
+            
+        # Re-issue tokens
+        user_payload = {
+            "sub": user_id,
+            "email": email,
+            "role": role,
+            "full_name": full_name or ""
         }
-    )
+        
+        access_token = create_access_token(user_payload)
+        refresh_token = create_refresh_token(user_payload)
+        
+        return api_response(
+            success=True,
+            message="Token refreshed",
+            data={
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "token_type": "bearer"
+            }
+        )
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Refresh Error: {str(e)}")
+        raise HTTPException(status_code=401, detail="Session expired or invalid. Please log in again.")
 
 @router.post("/register")
 async def register(request: RegisterRequest):
