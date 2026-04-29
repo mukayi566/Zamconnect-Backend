@@ -32,10 +32,10 @@ async def login(request: LoginRequest):
         user_id = response.user.id
 
         # 2a. Check citizens table first (mobile app users)
-        citizen_res = supabase.table("citizens").select("*").eq("id", user_id).single().execute()
+        citizen_res = supabase.table("citizens").select("*").eq("id", user_id).execute()
         
-        if citizen_res.data:
-            citizen = citizen_res.data
+        if citizen_res.data and len(citizen_res.data) > 0:
+            citizen = citizen_res.data[0]
             full_name = f"{citizen.get('first_name', '')} {citizen.get('last_name', '')}".strip()
             user_payload = {
                 "sub": user_id,
@@ -73,10 +73,10 @@ async def login(request: LoginRequest):
             )
 
         # 2b. Fall back to admin_users table (web admin panel)
-        admin_res = supabase.table("admin_users").select("*").eq("id", user_id).single().execute()
+        admin_res = supabase.table("admin_users").select("*").eq("id", user_id).execute()
 
-        if admin_res.data:
-            admin_data = admin_res.data
+        if admin_res.data and len(admin_res.data) > 0:
+            admin_data = admin_res.data[0]
             user_payload = {
                 "sub": user_id,
                 "email": request.email,
@@ -278,8 +278,8 @@ async def add_dependent(request: DependentCreateRequest, current_user: dict = De
         
         # Get guardian details from current_user
         guardian_id = current_user["id"]
-        guardian_res = supabase.table("citizens").select("*").eq("id", guardian_id).single().execute()
-        guardian_data = guardian_res.data
+        guardian_res = supabase.table("citizens").select("*").eq("id", guardian_id).execute()
+        guardian_data = guardian_res.data[0] if guardian_res.data and len(guardian_res.data) > 0 else None
         
         citizen_data = {
             "id": dependent_id,

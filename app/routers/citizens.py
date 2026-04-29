@@ -134,10 +134,10 @@ async def update_status(
 
 @router.get("/me")
 async def get_my_profile(current_user: dict = Depends(get_current_user)):
-    res = supabase.table("citizens").select("*").eq("id", current_user["sub"]).single().execute()
-    if not res.data:
+    res = supabase.table("citizens").select("*").eq("id", current_user["sub"]).execute()
+    if not res.data or len(res.data) == 0:
         raise HTTPException(status_code=404, detail="Citizen profile not found")
-    return api_response(success=True, message="Profile fetched", data=res.data)
+    return api_response(success=True, message="Profile fetched", data=res.data[0])
 
 
 @router.get("/dependents")
@@ -173,12 +173,12 @@ async def generate_citizen_qr_token(
     ]:
         raise HTTPException(status_code=403, detail="You may only request your own QR token")
 
-    res = supabase.table("citizens").select("id, first_name, last_name, status").eq("id", id).single().execute()
+    res = supabase.table("citizens").select("id, first_name, last_name, status").eq("id", id).execute()
 
-    if not res.data:
+    if not res.data or len(res.data) == 0:
         raise HTTPException(status_code=404, detail="Citizen not found")
 
-    citizen = res.data
+    citizen = res.data[0]
 
     if citizen["status"] != "active":
         raise HTTPException(
@@ -219,11 +219,11 @@ async def get_citizen_qr_legacy(
     current_user: dict = Depends(get_current_user),
 ):
     """[DEPRECATED] Returns HMAC-signed JSON QR payload. Use /qr-token instead."""
-    res = supabase.table("citizens").select("*").eq("id", id).single().execute()
-    if not res.data:
+    res = supabase.table("citizens").select("*").eq("id", id).execute()
+    if not res.data or len(res.data) == 0:
         raise HTTPException(status_code=404, detail="Citizen not found")
 
-    citizen = res.data
+    citizen = res.data[0]
     qr = generate_qr_payload(citizen)
 
     return api_response(

@@ -117,9 +117,9 @@ async def verify_qr(
 
     # Look up citizen in database
     citizen_id = payload.get("sub")
-    res = supabase.table("citizens").select("*").eq("id", citizen_id).single().execute()
+    res = supabase.table("citizens").select("*").eq("id", citizen_id).execute()
 
-    if not res.data:
+    if not res.data or len(res.data) == 0:
         await log_audit(
             action=AuditAction.VERIFY_QR,
             actor_id=current_user["sub"],
@@ -133,7 +133,7 @@ async def verify_qr(
         )
         return api_response(success=False, message="Citizen record not found", code="CITIZEN_NOT_FOUND")
 
-    citizen = res.data
+    citizen = res.data[0]
 
     # Verify citizen is active
     if citizen.get("status") != "active":
