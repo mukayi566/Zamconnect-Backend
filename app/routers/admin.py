@@ -14,6 +14,8 @@ async def get_dashboard_stats(current_user: dict = Depends(role_required([UserRo
     # Status counts
     active = supabase.table("citizens").select("*", count="exact").eq("status", "active").execute()
     pending = supabase.table("citizens").select("*", count="exact").eq("status", "pending").execute()
+    suspended = supabase.table("citizens").select("*", count="exact").eq("status", "suspended").execute()
+    rejected = supabase.table("citizens").select("*", count="exact").eq("status", "rejected").execute()
     
     # Recent activity (audit logs)
     recent = supabase.table("audit_logs").select("*").order("created_at", desc=True).limit(5).execute()
@@ -25,6 +27,8 @@ async def get_dashboard_stats(current_user: dict = Depends(role_required([UserRo
             "total_citizens": total.count,
             "active_count": active.count,
             "pending_count": pending.count,
+            "suspended_count": suspended.count,
+            "rejected_count": rejected.count,
             "recent_activity": recent.data
         }
     )
