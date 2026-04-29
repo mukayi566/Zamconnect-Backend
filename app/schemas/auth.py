@@ -31,6 +31,7 @@ class RegisterRequest(BaseModel):
     passport_url: Optional[str] = None
     birth_cert_url: Optional[str] = None
     selfie_url: Optional[str] = None
+    photo_url: Optional[str] = None
     signature_url: Optional[str] = None
     biometrics_enabled: Optional[bool] = False
     guardian_id: Optional[str] = None

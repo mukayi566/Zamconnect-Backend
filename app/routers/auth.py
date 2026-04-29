@@ -213,6 +213,7 @@ async def register(request: RegisterRequest):
             "passport_url": request.passport_url or None,
             "birth_cert_url": request.birth_cert_url or None,
             "selfie_url": request.selfie_url or None,
+            "photo_url": request.photo_url or request.selfie_url or None,
             "signature_url": request.signature_url or None,
             "biometrics_enabled": request.biometrics_enabled or False,
             "guardian_id": request.guardian_id or None,
