@@ -61,6 +61,40 @@ async def get_citizens(
     )
 
 
+# ---------------------------------------------------------------------------
+# My profile (authenticated citizen)
+# ---------------------------------------------------------------------------
+
+@router.get("/me")
+async def get_my_profile(current_user: dict = Depends(get_current_user)):
+    try:
+        user_id = current_user.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token payload: missing subject")
+
+        res = supabase.table("citizens").select("*").eq("id", user_id).execute()
+        
+        if not res.data or len(res.data) == 0:
+            raise HTTPException(status_code=404, detail="Citizen profile not found. Please complete registration.")
+            
+        return api_response(success=True, message="Profile fetched", data=res.data[0])
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error fetching profile for {current_user.get('email')}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal database error: {str(e)}")
+
+
+@router.get("/dependents")
+async def get_my_dependents(current_user: dict = Depends(get_current_user)):
+    res = supabase.table("citizens").select("*").eq("guardian_id", current_user["sub"]).execute()
+    return api_response(success=True, message="Dependents fetched", data=res.data)
+
+
+# ---------------------------------------------------------------------------
+# Get citizen by ID
+# ---------------------------------------------------------------------------
+
 @router.get("/{id}")
 async def get_citizen_by_id(
     id: str,
@@ -138,36 +172,6 @@ async def update_status(
     )
 
     return api_response(success=True, message="Status updated", data=res.data[0])
-
-
-# ---------------------------------------------------------------------------
-# My profile (authenticated citizen)
-# ---------------------------------------------------------------------------
-
-@router.get("/me")
-async def get_my_profile(current_user: dict = Depends(get_current_user)):
-    try:
-        user_id = current_user.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid token payload: missing subject")
-
-        res = supabase.table("citizens").select("*").eq("id", user_id).execute()
-        
-        if not res.data or len(res.data) == 0:
-            raise HTTPException(status_code=404, detail="Citizen profile not found. Please complete registration.")
-            
-        return api_response(success=True, message="Profile fetched", data=res.data[0])
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        print(f"Error fetching profile for {current_user.get('email')}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal database error: {str(e)}")
-
-
-@router.get("/dependents")
-async def get_my_dependents(current_user: dict = Depends(get_current_user)):
-    res = supabase.table("citizens").select("*").eq("guardian_id", current_user["sub"]).execute()
-    return api_response(success=True, message="Dependents fetched", data=res.data)
 
 
 # ---------------------------------------------------------------------------
