@@ -17,6 +17,7 @@ from app.models.enums import UserRole, CitizenStatus, AuditAction
 from app.utils.response import api_response
 from app.services.qr_service import generate_qr_token, generate_qr_payload
 from app.services.audit_service import log_audit
+from app.utils.nrc import generate_zambian_nrc
 import uuid
 
 router = APIRouter(prefix="/citizens", tags=["Citizens"])
@@ -157,10 +158,34 @@ async def update_status(
     request: CitizenStatusUpdateRequest,
     current_user: dict = Depends(role_required([UserRole.ADMIN])),
 ):
-    res = supabase.table("citizens").update({"status": request.status}).eq("id", id).execute()
+    # Fetch current citizen data
+    existing = supabase.table("citizens").select("*").eq("id", id).execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Citizen not found")
+    
+    citizen = existing.data[0]
+    update_data = {"status": request.status}
+
+    # If approving a Basic citizen without an NRC, generate one
+    if (
+        request.status == CitizenStatus.ACTIVE and 
+        citizen.get("registration_type") == "basic" and 
+        not citizen.get("nrc_number")
+    ):
+        new_nrc = generate_zambian_nrc()
+        # Ensure it's unique (basic check)
+        while True:
+            dup = supabase.table("citizens").select("id").eq("nrc_number", new_nrc).execute()
+            if not dup.data:
+                break
+            new_nrc = generate_zambian_nrc()
+        
+        update_data["nrc_number"] = new_nrc
+
+    res = supabase.table("citizens").update(update_data).eq("id", id).execute()
 
     if not res.data:
-        raise HTTPException(status_code=404, detail="Citizen not found")
+        raise HTTPException(status_code=500, detail="Failed to update citizen status")
 
     await log_audit(
         action=AuditAction.CHANGE_STATUS,
@@ -168,7 +193,11 @@ async def update_status(
         actor_email=current_user["email"],
         target_id=id,
         target_type="citizen",
-        details={"new_status": request.status, "reason": request.reason},
+        details={
+            "new_status": request.status, 
+            "reason": request.reason,
+            "generated_nrc": update_data.get("nrc_number")
+        },
     )
 
     return api_response(success=True, message="Status updated", data=res.data[0])
