@@ -20,10 +20,14 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/login")
 async def login(request: LoginRequest):
     try:
+        # 0. Clean input
+        email = request.email.strip().lower()
+        password = request.password
+
         # 1. Authenticate with Supabase Auth (works for ALL users)
         response = supabase.auth.sign_in_with_password({
-            "email": request.email,
-            "password": request.password
+            "email": email,
+            "password": password
         })
         
         if not response.user:
@@ -79,7 +83,7 @@ async def login(request: LoginRequest):
             admin_data = admin_res.data[0]
             user_payload = {
                 "sub": user_id,
-                "email": request.email,
+                "email": email,
                 "role": admin_data["role"],
                 "full_name": admin_data["full_name"],
                 "type": "admin",
@@ -90,7 +94,7 @@ async def login(request: LoginRequest):
             await log_audit(
                 action=AuditAction.LOGIN,
                 actor_id=user_id,
-                actor_email=request.email,
+                actor_email=email,
                 target_id=user_id,
                 target_type="admin",
                 details={"ip": "0.0.0.0"}
@@ -105,7 +109,7 @@ async def login(request: LoginRequest):
                     "token_type": "bearer",
                     "user": {
                         "id": user_id,
-                        "email": request.email,
+                        "email": email,
                         "role": admin_data["role"],
                         "full_name": admin_data["full_name"],
                     }
@@ -119,9 +123,15 @@ async def login(request: LoginRequest):
         )
 
     except HTTPException as he:
+        print(f"Login HTTPException: {he.detail}")
         raise he
     except Exception as e:
-        raise HTTPException(status_code=401, detail=str(e))
+        error_msg = str(e)
+        print(f"Login General Error: {error_msg}")
+        # Check if it's a Supabase error with a specific message
+        if "invalid" in error_msg.lower() and "credentials" in error_msg.lower():
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {error_msg}")
 
 @router.post("/refresh")
 async def refresh(request: RefreshRequest):
