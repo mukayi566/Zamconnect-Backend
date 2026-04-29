@@ -40,7 +40,9 @@ async def login(request: LoginRequest):
         
         if citizen_res.data and len(citizen_res.data) > 0:
             citizen = citizen_res.data[0]
-            full_name = f"{citizen.get('first_name', '')} {citizen.get('last_name', '')}".strip()
+            first_name = citizen.get('first_name') or ''
+            last_name = citizen.get('last_name') or ''
+            full_name = f"{first_name} {last_name}".strip()
             user_payload = {
                 "sub": user_id,
                 "email": request.email,
@@ -84,8 +86,8 @@ async def login(request: LoginRequest):
             user_payload = {
                 "sub": user_id,
                 "email": email,
-                "role": admin_data["role"],
-                "full_name": admin_data["full_name"],
+                "role": admin_data.get("role", "admin"),
+                "full_name": admin_data.get("full_name", ""),
                 "type": "admin",
             }
             access_token = create_access_token(user_payload)

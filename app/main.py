@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+import traceback
 from fastapi.middleware.cors import CORSMiddleware
 from app.config.settings import settings
 from app.routers import auth, citizens, verify, ussd, audit, admin
@@ -35,14 +37,20 @@ def create_app() -> FastAPI:
 
 
 
-    @app.get("/")
-    async def root():
-        return {
-            "name": settings.APP_NAME,
-            "version": "1.0.0",
-            "status": "operational",
-            "environment": settings.APP_ENV
-        }
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        error_msg = str(exc)
+        stack_trace = traceback.format_exc()
+        print(f"Global Exception: {error_msg}\n{stack_trace}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "message": "Internal Server Error",
+                "detail": error_msg,
+                "traceback": stack_trace if settings.APP_DEBUG else None
+            }
+        )
 
     return app
 

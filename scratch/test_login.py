@@ -1,26 +1,24 @@
-import os
 import sys
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+import os
+sys.path.append(os.path.join(os.getcwd(), 'app'))
 from app.config.supabase import supabase
+from app.services.token_service import create_access_token
 
-email = "admin@zamid.gov.zm"
-password = "ZamID@2026!"
-
-print(f"Attempting login for: {email}")
-
-try:
-    response = supabase.auth.sign_in_with_password({
-        "email": email,
-        "password": password
-    })
+def test_login():
+    email = "test@example.com"
+    password = "password"
     
-    if response.user:
-        print(f"Login SUCCESS! User ID: {response.user.id}")
-    else:
-        print("Login FAILED. No user returned.")
+    try:
+        print(f"Attempting to sign in with {email}...")
+        # Note: This might fail if the user doesn't exist, which is fine
+        # We just want to see if the call itself crashes
+        response = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": password
+        })
+        print(f"Response: {response}")
+    except Exception as e:
+        print(f"Error during sign in: {e}")
 
-except Exception as e:
-    print(f"Login FAILED with exception: {e}")
+if __name__ == "__main__":
+    test_login()

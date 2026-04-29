@@ -8,15 +8,23 @@ security = HTTPBearer()
 
 async def get_current_user(auth: HTTPAuthorizationCredentials = Security(security)):
     token = auth.credentials
-    payload = decode_token(token, settings.JWT_ACCESS_SECRET)
-    
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    if payload.get("type") != "access":
-        raise HTTPException(status_code=401, detail="Invalid token type")
+    try:
+        payload = decode_token(token, settings.JWT_ACCESS_SECRET)
         
-    return payload
+        if not payload:
+            print("Token decoding failed: Payload is None")
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        
+        if payload.get("type") != "access":
+            print(f"Token type mismatch: Expected 'access', got '{payload.get('type')}'")
+            raise HTTPException(status_code=401, detail="Invalid token type")
+            
+        return payload
+    except Exception as e:
+        if not isinstance(e, HTTPException):
+            print(f"Auth Middleware Error: {str(e)}")
+            raise HTTPException(status_code=401, detail="Authentication failed")
+        raise e
 
 def role_required(allowed_roles: list[UserRole]):
     async def role_checker(user: dict = Depends(get_current_user)):
