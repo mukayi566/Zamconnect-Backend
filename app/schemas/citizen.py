@@ -28,6 +28,7 @@ class CitizenCreateRequest(BaseModel):
     selfie_url: Optional[str] = None
     photo_url: Optional[str] = None
     signature_url: Optional[str] = None
+    nrc_back_url: Optional[str] = None
     biometrics_enabled: Optional[bool] = False
 
     @field_validator("nrc_number")
@@ -66,6 +67,7 @@ class CitizenUpdateRequest(BaseModel):
     selfie_url: Optional[str] = None
     signature_url: Optional[str] = None
     nrc_url: Optional[str] = None
+    nrc_back_url: Optional[str] = None
     passport_url: Optional[str] = None
     birth_cert_url: Optional[str] = None
 
@@ -90,6 +92,7 @@ class CitizenResponse(BaseModel):
     selfie_url: Optional[str] = None
     photo_url: Optional[str] = None
     signature_url: Optional[str] = None
+    nrc_back_url: Optional[str] = None
 
 class PaginatedCitizenResponse(BaseModel):
     success: bool

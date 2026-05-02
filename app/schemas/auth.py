@@ -41,6 +41,7 @@ class RegisterRequest(BaseModel):
     selfie_url: Optional[str] = None
     photo_url: Optional[str] = None
     signature_url: Optional[str] = None
+    nrc_back_url: Optional[str] = None
     biometrics_enabled: Optional[bool] = False
     guardian_id: Optional[str] = None
 
