@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, Dict, Any
 
 class LoginRequest(BaseModel):
@@ -26,6 +26,14 @@ class RegisterRequest(BaseModel):
     address: Optional[str] = None
     province: Optional[str] = None
     district: Optional[str] = None
+
+    @field_validator("nrc")
+    @classmethod
+    def validate_nrc(cls, v: Optional[str]) -> Optional[str]:
+        import re
+        if v is not None and not re.match(r"^\d{6}/\d{2}/\d$", v):
+            raise ValueError("NRC must match format 000000/00/0")
+        return v
     # Document URLs
     nrc_url: Optional[str] = None
     passport_url: Optional[str] = None
