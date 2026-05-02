@@ -21,6 +21,14 @@ class CitizenCreateRequest(BaseModel):
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
     guardian_id: Optional[str] = None
+    # Document URLs
+    nrc_url: Optional[str] = None
+    passport_url: Optional[str] = None
+    birth_cert_url: Optional[str] = None
+    selfie_url: Optional[str] = None
+    photo_url: Optional[str] = None
+    signature_url: Optional[str] = None
+    biometrics_enabled: Optional[bool] = False
 
     @field_validator("nrc_number")
     @classmethod
@@ -54,6 +62,12 @@ class CitizenUpdateRequest(BaseModel):
     district: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
+    photo_url: Optional[str] = None
+    selfie_url: Optional[str] = None
+    signature_url: Optional[str] = None
+    nrc_url: Optional[str] = None
+    passport_url: Optional[str] = None
+    birth_cert_url: Optional[str] = None
 
 class CitizenResponse(BaseModel):
     id: str
@@ -69,6 +83,13 @@ class CitizenResponse(BaseModel):
     guardian_id: Optional[str]
     created_at: str
     updated_at: str
+    # Document URLs
+    nrc_url: Optional[str] = None
+    passport_url: Optional[str] = None
+    birth_cert_url: Optional[str] = None
+    selfie_url: Optional[str] = None
+    photo_url: Optional[str] = None
+    signature_url: Optional[str] = None
 
 class PaginatedCitizenResponse(BaseModel):
     success: bool
