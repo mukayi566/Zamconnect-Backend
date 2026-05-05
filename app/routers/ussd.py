@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, Response
 from app.config.supabase import supabase
 from app.models.enums import CitizenStatus, AuditAction
 from datetime import datetime, timezone
+from app.utils.ssn import generate_ssn
 
 router = APIRouter(prefix="/ussd", tags=["USSD"])
 
@@ -45,8 +46,9 @@ async def ussd_handler(request: Request):
             "CON Welcome to ZamID Connect\n"
             "1. Check ID Status\n"
             "2. Verify NRC Number\n"
-            "3. Report Lost NRC\n"
-            "4. Help & Info\n"
+            "3. Create Account\n"
+            "4. Report Lost NRC\n"
+            "5. Help & Info\n"
             "0. Exit"
         )
 
@@ -108,8 +110,76 @@ async def ussd_handler(request: Request):
             except Exception:
                 response_text = "END Service temporarily unavailable. Please try again later."
 
-    # ── Option 3: Report Lost NRC ────────────────────────────────
+    # ── Option 3: Create Account ────────────────────────────────
     elif parts[0] == "3":
+        if level == 1:
+            response_text = "CON Create ZamID Account\nEnter NRC Number (e.g. 123456/78/9):"
+        elif level == 2:
+            response_text = "CON Enter First Name:"
+        elif level == 3:
+            response_text = "CON Enter Last Name:"
+        elif level == 4:
+            response_text = "CON Select Gender:\n1. Male\n2. Female"
+        elif level == 5:
+            response_text = "CON Enter Place of Birth (Province):"
+        elif level == 6:
+            nrc = parts[1].strip()
+            fname = parts[2].strip()
+            lname = parts[3].strip()
+            gender_code = parts[4].strip()
+            place = parts[5].strip()
+            
+            gender = "Male" if gender_code == "1" else "Female"
+            ssn = generate_ssn()
+            
+            try:
+                # Check if NRC already exists
+                existing = supabase.table("citizens").select("id").eq("nrc_number", nrc).execute()
+                if existing.data:
+                    response_text = f"END Error: NRC {nrc} is already registered."
+                else:
+                    # Insert new citizen
+                    citizen_data = {
+                        "nrc_number": nrc,
+                        "first_name": fname,
+                        "last_name": lname,
+                        "gender": gender,
+                        "province": place,
+                        "status": CitizenStatus.PENDING.value,
+                        "registration_type": "ussd",
+                        "date_of_birth": "2000-01-01", # Default for USSD
+                        "ssn": ssn
+                    }
+                    
+                    try:
+                        supabase.table("citizens").insert(citizen_data).execute()
+                        log_ussd_session(session_id, phone_number, "ACCOUNT_CREATED", f"NRC={nrc} SSN={ssn}")
+                        response_text = (
+                            f"END Success! Account created for {fname} {lname}.\n"
+                            f"Your NRC: {nrc}\n"
+                            f"Generated SSN: {ssn}\n"
+                            f"Visit a registrar to activate."
+                        )
+                    except Exception as e:
+                        # Fallback if ssn column is missing
+                        if "column \"ssn\"" in str(e):
+                            del citizen_data["ssn"]
+                            supabase.table("citizens").insert(citizen_data).execute()
+                            log_ussd_session(session_id, phone_number, "ACCOUNT_CREATED", f"NRC={nrc}")
+                            response_text = (
+                                f"END Account created for {fname} {lname}.\n"
+                                f"NRC: {nrc}\n"
+                                f"Generated SSN: {ssn}\n"
+                                f"Note: SSN generated but not saved to DB."
+                            )
+                        else:
+                            raise e
+            except Exception as e:
+                print(f"USSD Registration Error: {str(e)}")
+                response_text = "END Service temporarily unavailable. Please try again later."
+
+    # ── Option 4: Report Lost NRC ────────────────────────────────
+    elif parts[0] == "4":
         if level == 1:
             response_text = (
                 "CON Report Lost NRC:\n"
@@ -129,8 +199,8 @@ async def ussd_handler(request: Request):
         else:
             response_text = "END Invalid option."
 
-    # ── Option 4: Help & Info ─────────────────────────────────────
-    elif parts[0] == "4":
+    # ── Option 5: Help & Info ─────────────────────────────────────
+    elif parts[0] == "5":
         log_ussd_session(session_id, phone_number, "HELP_INFO")
         response_text = (
             "END ZamID Connect Help:\n"

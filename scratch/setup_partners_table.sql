@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS partners (
 -- Enable RLS
 ALTER TABLE partners ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies if they exist to avoid errors during re-run
+DROP POLICY IF EXISTS "Admins have full access to partners" ON partners;
+DROP POLICY IF EXISTS "Public can apply for partner status" ON partners;
+
 -- Create policy for admins (full access)
 CREATE POLICY "Admins have full access to partners" 
 ON partners FOR ALL 
@@ -29,6 +33,3 @@ USING (auth.jwt() ->> 'role' = 'admin');
 CREATE POLICY "Public can apply for partner status" 
 ON partners FOR INSERT 
 WITH CHECK (true);
-
--- Create policy for partners to view their own data (using API key or auth)
--- Note: This might need more complex logic if partners authenticate differently
