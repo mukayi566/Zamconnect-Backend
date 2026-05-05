@@ -237,6 +237,7 @@ async def register(request: RegisterRequest):
             "district": request.district or None,
             "address": request.address or None,
             "nrc_url": request.nrc_url or None,
+            "nrc_back_url": request.nrc_back_url or None,
             "passport_url": request.passport_url or None,
             "birth_cert_url": request.birth_cert_url or None,
             "selfie_url": request.selfie_url or None,
