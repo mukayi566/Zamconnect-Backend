@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 import traceback
 from fastapi.middleware.cors import CORSMiddleware
 from app.config.settings import settings
-from app.routers import auth, citizens, verify, ussd, audit, admin
+from app.routers import auth, citizens, verify, ussd, audit, admin, partners
 
 def create_app() -> FastAPI:
     app = FastAPI(
@@ -30,6 +30,10 @@ def create_app() -> FastAPI:
     app.include_router(ussd.router, prefix="/api")
     app.include_router(audit.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
+    app.include_router(partners.router, prefix="/api")
+    
+    # Partner Portal Compatibility
+    app.include_router(partners.router, prefix="/v1")
 
     @app.get("/api")
     async def api_root():
