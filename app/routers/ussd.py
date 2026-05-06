@@ -3,6 +3,7 @@ from app.config.supabase import supabase
 from app.models.enums import CitizenStatus, AuditAction
 from datetime import datetime, timezone
 from app.utils.ssn import generate_ssn
+from app.utils.zam_id import generate_zam_id
 import uuid
 from app.services.qr_service import generate_qr_payload
 
@@ -133,6 +134,7 @@ async def ussd_handler(request: Request):
             
             gender = "Male" if gender_code == "1" else "Female"
             ssn = generate_ssn()
+            zam_id = generate_zam_id()
             citizen_id = str(uuid.uuid4())
             
             try:
@@ -153,7 +155,8 @@ async def ussd_handler(request: Request):
                         "registration_type": "ussd",
                         "date_of_birth": "2000-01-01", # Default for USSD
                         "phone": phone_number,
-                        "ssn": ssn
+                        "ssn": ssn,
+                        "zam_id": zam_id
                     }
                     
                     # Generate QR Payload
@@ -165,24 +168,27 @@ async def ussd_handler(request: Request):
 
                     try:
                         supabase.table("citizens").insert(citizen_data).execute()
-                        log_ussd_session(session_id, phone_number, "ACCOUNT_CREATED", f"NRC={nrc} SSN={ssn}")
+                        log_ussd_session(session_id, phone_number, "ACCOUNT_CREATED", f"NRC={nrc} SSN={ssn} ZamID={zam_id}")
                         response_text = (
                             f"END Success! Account created for {fname} {lname}.\n"
+                            f"Unique ZamID: {zam_id}\n"
                             f"Your NRC: {nrc}\n"
                             f"Generated SSN: {ssn}\n"
                             f"Visit a registrar to activate."
                         )
                     except Exception as e:
-                        # Fallback if ssn column is missing
-                        if "column \"ssn\"" in str(e):
-                            del citizen_data["ssn"]
+                        # Fallback if ssn or zam_id columns are missing
+                        if "column \"ssn\"" in str(e) or "column \"zam_id\"" in str(e):
+                            if "ssn" in citizen_data: del citizen_data["ssn"]
+                            if "zam_id" in citizen_data: del citizen_data["zam_id"]
                             supabase.table("citizens").insert(citizen_data).execute()
                             log_ussd_session(session_id, phone_number, "ACCOUNT_CREATED", f"NRC={nrc}")
                             response_text = (
                                 f"END Account created for {fname} {lname}.\n"
+                                f"Unique ZamID: {zam_id}\n"
                                 f"NRC: {nrc}\n"
                                 f"Generated SSN: {ssn}\n"
-                                f"Note: SSN generated but not saved to DB."
+                                f"Note: ID generated but not saved to DB profile."
                             )
                         else:
                             raise e

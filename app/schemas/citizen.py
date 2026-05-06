@@ -31,6 +31,7 @@ class CitizenCreateRequest(BaseModel):
     nrc_back_url: Optional[str] = None
     biometrics_enabled: Optional[bool] = False
     ssn: Optional[str] = None
+    zam_id: Optional[str] = None
 
     @field_validator("nrc_number")
     @classmethod
@@ -95,6 +96,7 @@ class CitizenResponse(BaseModel):
     signature_url: Optional[str] = None
     nrc_back_url: Optional[str] = None
     ssn: Optional[str] = None
+    zam_id: Optional[str] = None
 
 class PaginatedCitizenResponse(BaseModel):
     success: bool
