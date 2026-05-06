@@ -134,7 +134,7 @@ async def ussd_handler(request: Request):
             
             gender = "Male" if gender_code == "1" else "Female"
             ssn = generate_ssn()
-            zam_id = generate_zam_id()
+            citizen_id = generate_zam_id()
             citizen_id = str(uuid.uuid4())
             
             try:
@@ -156,7 +156,7 @@ async def ussd_handler(request: Request):
                         "date_of_birth": "2000-01-01", # Default for USSD
                         "phone": phone_number,
                         "ssn": ssn,
-                        "zam_id": zam_id
+                        "zam_id": citizen_id
                     }
                     
                     # Generate QR Payload
@@ -168,10 +168,10 @@ async def ussd_handler(request: Request):
 
                     try:
                         supabase.table("citizens").insert(citizen_data).execute()
-                        log_ussd_session(session_id, phone_number, "ACCOUNT_CREATED", f"NRC={nrc} SSN={ssn} ZamID={zam_id}")
+                        log_ussd_session(session_id, phone_number, "ACCOUNT_CREATED", f"NRC={nrc} SSN={ssn} ZamID={citizen_id}")
                         response_text = (
                             f"END Success! Account created for {fname} {lname}.\n"
-                            f"Unique ZamID: {zam_id}\n"
+                            f"Unique ZamID: {citizen_id}\n"
                             f"Your NRC: {nrc}\n"
                             f"Generated SSN: {ssn}\n"
                             f"Visit a registrar to activate."
@@ -185,7 +185,7 @@ async def ussd_handler(request: Request):
                             log_ussd_session(session_id, phone_number, "ACCOUNT_CREATED", f"NRC={nrc}")
                             response_text = (
                                 f"END Account created for {fname} {lname}.\n"
-                                f"Unique ZamID: {zam_id}\n"
+                                f"Unique ZamID: {citizen_id}\n"
                                 f"NRC: {nrc}\n"
                                 f"Generated SSN: {ssn}\n"
                                 f"Note: ID generated but not saved to DB profile."
