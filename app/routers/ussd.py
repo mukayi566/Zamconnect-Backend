@@ -3,6 +3,8 @@ from app.config.supabase import supabase
 from app.models.enums import CitizenStatus, AuditAction
 from datetime import datetime, timezone
 from app.utils.ssn import generate_ssn
+import uuid
+from app.services.qr_service import generate_qr_payload
 
 router = APIRouter(prefix="/ussd", tags=["USSD"])
 
@@ -131,6 +133,7 @@ async def ussd_handler(request: Request):
             
             gender = "Male" if gender_code == "1" else "Female"
             ssn = generate_ssn()
+            citizen_id = str(uuid.uuid4())
             
             try:
                 # Check if NRC already exists
@@ -140,6 +143,7 @@ async def ussd_handler(request: Request):
                 else:
                     # Insert new citizen
                     citizen_data = {
+                        "id": citizen_id,
                         "nrc_number": nrc,
                         "first_name": fname,
                         "last_name": lname,
@@ -148,9 +152,17 @@ async def ussd_handler(request: Request):
                         "status": CitizenStatus.PENDING.value,
                         "registration_type": "ussd",
                         "date_of_birth": "2000-01-01", # Default for USSD
+                        "phone": phone_number,
                         "ssn": ssn
                     }
                     
+                    # Generate QR Payload
+                    try:
+                        citizen_data["qr_payload"] = generate_qr_payload(citizen_data)
+                    except Exception as qr_err:
+                        print(f"USSD QR Generation Error: {qr_err}")
+                        citizen_data["qr_payload"] = None
+
                     try:
                         supabase.table("citizens").insert(citizen_data).execute()
                         log_ussd_session(session_id, phone_number, "ACCOUNT_CREATED", f"NRC={nrc} SSN={ssn}")
